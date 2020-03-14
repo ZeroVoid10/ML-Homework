@@ -6,8 +6,10 @@ import matplotlib.pyplot as plt
 
 class KFlodCrossValidationData:
     def __init__(self, n_splits):
+        self.clf_name = ''
         self.n_splits = n_splits
         self.confusion_mat = []
+        self.sum_conf_mat = np.array([[0,0],[0,0]])
         self.P = []
         self.R = []
         self.F1 = []
@@ -34,13 +36,46 @@ class KFlodCrossValidationData:
             X: Test Samples
             y: True labels for X
         """
+        self.clf_name = type(clf).__name__ + ' '
         self.predict_proba.append(clf.predict_proba(X))
         self.pred.append(clf.predict(X))
         self.score.append(clf.score(X, y))
         self.__cal_matrix(clf, y)
         self.__pr_roc_curve(y)
     
-    def plot_pr_curve(self, ax, index=None, fliter=None, mean=True):
+    def print_mat(self, print_conf=False):
+        print(f'\n\n====={self.clf_name}Confusion Matrix & P & R & F1=====')
+        for i,(mat,p,r,f1) in enumerate(zip(self.confusion_mat,
+                                self.P, self.R, self.F1)):
+            print(f'\n---Flod {i+1}--')
+            if print_conf:
+                print(f'Confusion Mat:\n{mat}')
+            print(f'P = {p}')
+            print(f'R = {r}')
+            print(f'F1 = {f1}')
+        print('\n---Mean P & R & F1---')
+        print(f'Mean P = {np.mean(self.P)}')
+        print(f'Mean R = {np.mean(self.R)}')
+        print(f'Mean F1 = {np.mean(self.F1)}')
+        if print_conf:
+            print('\n---Sum/Mean Confusion Matrix---')
+            print(f'Sum Confusion Matrix = \n{self.sum_conf_mat}')
+            print(f'Mean Confusion Matrix = \n{self.sum_conf_mat/self.n_splits}')
+
+    def plot_confusion_mat(self, ax_list, pre_title=''):
+        for i,(mat,ax) in enumerate(zip(self.confusion_mat, ax_list)):
+            vis = ConfusionMatrixDisplay(mat, '01')
+            vis.plot(ax=ax, values_format='d')
+            ax.set_title(f'flod {i+1}')
+        if len(ax_list) == self.n_splits + 2:
+            vis = ConfusionMatrixDisplay(self.sum_conf_mat,'01')
+            vis.plot(ax=ax_list[-2], values_format='d')
+            ax_list[-2].set_title('Sum Confusion Matrix')
+            vis = ConfusionMatrixDisplay(self.sum_conf_mat/self.n_splits,'01')
+            vis.plot(ax=ax_list[-1], values_format='.2f')
+            ax_list[-1].set_title('Mean Confusion Matrix')
+    
+    def plot_pr_curve(self, ax, pre_title='', index=None, fliter=None, mean=True):
         """ 在ax上绘制PR曲线, 并计算平均值
         Args:
             ax: matplotlib 中的 axes
@@ -52,7 +87,7 @@ class KFlodCrossValidationData:
             mean: True or False
                 在index和fliter为None时是否计算均值
         """
-        ax.set_title('P-R Curve')
+        ax.set_title(pre_title + 'P-R Curve')
         ax.set_ylabel('Precision')
         ax.set_xlabel('Recall')
         if index is None and fliter is None:
@@ -71,7 +106,7 @@ class KFlodCrossValidationData:
                 self.mean_ap = auc(self.mean_r, self.mean_p)
         ax.legend(loc='lower left')
     
-    def plot_roc_curve(self, ax, index=None, fliter=None, mean=True):
+    def plot_roc_curve(self, ax, pre_title='',index=None, fliter=None, mean=True):
         """ 在ax上绘制ROC曲线, 并计算平均值
         Args:
             ax: matplotlib 中的 axes
@@ -83,7 +118,7 @@ class KFlodCrossValidationData:
             mean: True or False
                 在index和fliter为None时是否计算均值
         """
-        ax.set_title('ROC Curve')
+        ax.set_title(pre_title + 'ROC Curve')
         ax.set_ylabel('True Positive Rate')
         ax.set_xlabel('False Positive Rate')
         if index is None and fliter is None:
@@ -99,12 +134,12 @@ class KFlodCrossValidationData:
                 self.mean_tpr /= self.n_splits
                 self.mean_tpr[-1] = 1.0
                 self.mean_tpr[0] = 0.0
-                self.mean_auc = auc(self.mean_fpr, self.mean_fpr)
+                self.mean_auc = auc(self.mean_fpr, self.mean_tpr)
         ax.legend(loc='lower right')
 
-    def plot_mean_pr_curve(self, ax, title='Mean P-R Curve'):
+    def plot_mean_pr_curve(self, ax, pre_title=''):
         """ ax画布上绘制mean pr 曲线 """
-        ax.set_title(title)
+        ax.set_title('Mean P-R Curve')
         ax.set_ylabel('Precision')
         ax.set_xlabel('Recall')
         if self.mean_p is None:
@@ -116,12 +151,12 @@ class KFlodCrossValidationData:
             self.mean_p[0] = 1.0
             self.mean_ap = auc(self.mean_r, self.mean_p)
         ax.plot(self.mean_r, self.mean_p, 
-                    label=f'mean P-R(mean AP = {self.mean_ap:.2f})')
+                    label=f'{pre_title}mean P-R(mean AP = {self.mean_ap:.2f})')
         ax.legend(loc='lower left')
 
-    def plot_mean_roc_curve(self, ax, title='Mean ROC Curve'):
+    def plot_mean_roc_curve(self, ax, pre_title=''):
         """ ax画布上绘制mean roc曲线 """
-        ax.set_title(title)
+        ax.set_title('Mean ROC Curve')
         ax.set_ylabel('True Positive Rate')
         ax.set_xlabel('False Positive Rate')
         if self.mean_tpr is None:
@@ -131,10 +166,16 @@ class KFlodCrossValidationData:
             self.mean_tpr /= self.n_splits
             self.mean_tpr[-1] = 1.0
             self.mean_tpr[0] = 0.0
-            self.mean_auc = auc(self.mean_fpr, self.mean_fpr)
+            self.mean_auc = auc(self.mean_fpr, self.mean_tpr)
         ax.plot(self.mean_fpr, self.mean_tpr, 
-                    label=f'mean ROC(mean AUC = {self.mean_auc:.2f})')
+                    label=f'{pre_title}mean ROC(mean AUC = {self.mean_auc:.2f})')
         ax.legend(loc='lower right')
+    
+    def plot_all(self, ax_list, pre_title=''):
+        self.plot_pr_curve(ax_list[0], pre_title=pre_title)
+        self.plot_roc_curve(ax_list[1], pre_title=pre_title)
+        self.plot_mean_pr_curve(ax_list[2], pre_title=pre_title)
+        self.plot_mean_roc_curve(ax_list[3], pre_title=pre_title)
 
     def __cal_matrix(self, clf, y):
         """ 计算混淆矩阵,P,R,F1
@@ -144,6 +185,7 @@ class KFlodCrossValidationData:
             y: True labels for X
         """
         self.confusion_mat.append(confusion_matrix(y, self.pred[-1]))
+        self.sum_conf_mat += self.confusion_mat[-1]
         self.P.append(precision_score(y, self.pred[-1]))
         self.R.append(recall_score(y, self.pred[-1]))
         self.F1.append(f1_score(y, self.pred[-1]))

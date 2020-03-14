@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
-@auther Zero Void
+@auther fsy,zx,syj,Zero Void(lsx)
 @date   2020/03/05
 
 使用sklearn框架完成作业内容。
@@ -12,15 +12,13 @@ import pandas as pd
 from scipy.stats import ttest_rel
 import seaborn as sns
 import matplotlib.pyplot as plt
-import matplotlib.axes as axes
 from kflod_cross_validation import KFlodCrossValidationData
 
+from sklearn.metrics import plot_confusion_matrix
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import cross_val_score
-from sklearn import svm
 from sklearn.naive_bayes import GaussianNB
 from sklearn.naive_bayes import BernoulliNB
-from sklearn.metrics import *
 
 class HW1:
     def __init__(self, dataset_path="homework-1/"):
@@ -57,6 +55,7 @@ class HW1:
             self.__countplot('income_ >50K')
     
     def train(self, clf, n_splits=10):
+        self.n_splits = n_splits
         self.sp = StratifiedKFold(n_splits=n_splits)
         flod_data = KFlodCrossValidationData(n_splits)
         self.est_data[clf] = flod_data
@@ -68,6 +67,10 @@ class HW1:
             y_test = self.y.loc[test_index]
             clf.fit(X_train, y_train)
             flod_data.add_data(clf, X_test, y_test)
+        self.plot_confusion_mat(clf, pre_title=type(clf).__name__ + ' ')
+        flod_data.print_mat()
+        
+        return self
     
     def plot_pr_roc_curve(self, clf, suptitle):
         """ 对clf评估数据绘制PR, ROC曲线 """
@@ -77,21 +80,79 @@ class HW1:
         roc_ax = fig.add_subplot(222)
         mean_pr_ax = fig.add_subplot(223)
         mean_roc_ax = fig.add_subplot(224)
-        flod_data = self.est_data[clf]
-        if flod_data is not None:
-            flod_data.plot_pr_curve(pr_ax)
-            flod_data.plot_roc_curve(roc_ax)
-            flod_data.plot_mean_pr_curve(mean_pr_ax)
-            flod_data.plot_mean_roc_curve(mean_roc_ax)
+        self.__plot_pr_roc_curve(clf, [pr_ax, roc_ax, mean_pr_ax, mean_roc_ax])
+        plt.show()
+
     
-    def clf_cmp(self, clf_1, clf_2, n_splits):
-        data_1 = train(clf_1)
-        data_2 = train(clf_2)
+    def clf_cmp(self, clfs, n_splits=10):
+        """ 对clfs中分类器绘图比较 """
+        # Train
+        length = len(clfs)
+        for res in map(self.train, clfs, [n_splits]*n_splits):
+            pass
+
+        # Plot PR ROC curve
+        if length == 1:
+            self.plot_pr_roc_curve(clfs[0], type(clfs[0]).__name__)
+        elif length == 2:
+            fig = plt.figure(figsize=(18, 10))
+            fig.suptitle(type(clfs[0]).__name__ + ' & ' 
+                        + type(clfs[1]).__name__ + ' CMP', fontsize=16)
+            mean_pr_ax = fig.add_subplot(233)
+            mean_roc_ax = fig.add_subplot(236)
+            self.__plot_pr_roc_curve(clfs[0], 
+                            [fig.add_subplot(231), fig.add_subplot(232), 
+                            mean_pr_ax, mean_roc_ax],
+                            type(clfs[0]).__name__ + ' ')
+            self.__plot_pr_roc_curve(clfs[1], 
+                            [fig.add_subplot(234), fig.add_subplot(235), 
+                            mean_pr_ax, mean_roc_ax],
+                            type(clfs[1]).__name__ + ' ')
+            # Paired t-test
+            self.paired_ttest(clfs[0], clfs[1])
+        else:
+            fig = plt.figure(figsize=(14, 5))
+            fig.suptitle('CMP', fontsize=16)
+            pr_ax = fig.add_subplot(211)
+            roc_ax = fig.add_subplot(212)
+            for clf in clfs:
+                if clf in self.est_data:
+                    flod_data = self.est_data[clf]
+                    flod_data.plot_mean_pr_curve(pr_ax, type(clf).__name__ + ' ')
+                    flod_data.plot_mean_roc_curve(roc_ax, type(clf).__name__ + ' ')
+        
+
+    
+    def plot_confusion_mat(self, clf, fig=None, pre_title=''):
+        if clf in self.est_data:
+            ax_list = []
+            if fig is None:
+                fig = plt.figure(figsize=(15,10))
+                # fig = plt.figure()
+            fig.suptitle(pre_title + 'Confusion Matrix', fontsize=16)
+            for i in range(self.n_splits):
+                ax_list.append(fig.add_subplot(3, 4, i+1))
+            ax_list.append(fig.add_subplot(3,4, 11))
+            ax_list.append(fig.add_subplot(3,4, 12))
+            self.est_data[clf].plot_confusion_mat(ax_list)
+            fig.tight_layout()
+
+    def paired_ttest(self, clf_1, clf_2):
+        if clf_1 in self.est_data and clf_2 in self.est_data:
+            statistic, pvalue = ttest_rel(self.est_data[clf_1].score,
+                                          self.est_data[clf_2].score)
+            print('\n\n=====Paired T-Test=====')
+            print(f'statisitc = {statistic}\npvalue = {pvalue}')
 
     def train_sk(self, clf, n_splits=10):
         gnb_scores = cross_val_score(clf, self.X, self.y, cv=10, scoring='accuracy')
         print(gnb_scores)
         print(gnb_scores.mean())
+    
+    def __plot_pr_roc_curve(self, clf, ax_list, pre_title=''):
+        if clf in self.est_data:
+            flod_data = self.est_data[clf]
+            flod_data.plot_all(ax_list, pre_title)
     
     def __dataset_warn(self):
         if self.data_frame is not None:
@@ -108,12 +169,15 @@ if __name__ == "__main__":
     bnb = BernoulliNB()
     hw = HW1()
     hw.load_adult()
-    gnb_data = hw.train(gnb)
+    # hw.train(gnb)
+    hw.clf_cmp([gnb, bnb])
+    # hw.plot_confusion_mat(gnb)
+    plt.show()
+    # gnb_data = hw.train(gnb)
     # bnb_data = hw.train(bnb)
-    hw.plot_pr_roc_curve(gnb, 'GaussianNB')
+    # hw.plot_pr_roc_curve(gnb, 'GaussianNB')
     # cmp_fig = plt.figure()
 
-    plt.show()
     #hw.train(bnb)
     #hw.train_sk(gnb)
     #print(hw.cls_cnt)
