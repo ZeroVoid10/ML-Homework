@@ -68,7 +68,7 @@ class HW1:
             X_test = self.X.loc[test_index]
             y_test = self.y.loc[test_index]
             clf.fit(X_train, y_train)
-            flod_data.add_data(clf, X_test, y_test, False)
+            flod_data.add_data(clf, X_test, y_test)
         self.plot_confusion_mat(clf, pre_title=type(clf).__name__ + ' ')
         flod_data.print_mat()
         
