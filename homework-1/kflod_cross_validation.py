@@ -3,6 +3,7 @@
 from sklearn.metrics import *
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.utils.validation import column_or_1d
 
 class KFlodCrossValidationData:
     def __init__(self, n_splits):
@@ -210,17 +211,27 @@ class KFlodCrossValidationData:
         r = []
         thr = []
         # 获取可作为阈值index
-        desc_score_indices = np.argsort(probas_pred)[::-1]
-        y_true = y_true[desc_score_indices]
+        y_true = column_or_1d(y_true)
+        probas_pred = column_or_1d(probas_pred)
+        desc_score_indices = np.argsort(probas_pred, kind="mergesort")[::-1]
         probas_pred = probas_pred[desc_score_indices]
+        y_true = y_true[desc_score_indices]
         distinct_value_indices = np.where(np.diff(probas_pred))[0]
         threshold_idxs = np.r_[distinct_value_indices, y_true.size - 1]
-        for t in threshold_idxs:
-            tp, tn, fp, fn = self.__get_tp_tn_fp_fn(y_true, probas_pred, probas_pred[t])
-            p.append(tp/(tp+fp))
-            r.append(tp/(tp+fn))
-            thr.append(probas_pred[t])
-        return [p,r,thr]
+
+        tps = np.cumsum(y_true)[threshold_idxs]
+        fps = 1 + threshold_idxs - tps
+        p = tps/(tps + fps)
+        p[np.isnan(p)] = 0
+        r = tps/tps[-1]
+        last_ind = tps.searchsorted(tps[-1])
+        sl = slice(last_ind, None, -1)
+        return np.r_[p[sl], 1], np.r_[r[sl], 0], thr[sl]
+        # for t in threshold_idxs:
+        #     tp, tn, fp, fn = self.__get_tp_tn_fp_fn(y_true, probas_pred, t)
+        #     p.append(tp/(tp+fp))
+        #     r.append(tp/(tp+fn))
+        #     thr.append(probas_pred[t])
 
     def __get_tp_tn_fp_fn(self, y_true, probas_pred, thr):
         TP = 0
@@ -230,12 +241,12 @@ class KFlodCrossValidationData:
 
         for i in range(0, len(y_true)):
             if(y_true[i] == 1):
-                if(probas_pred[i] >= 1):
+                if(i >= thr):
                     TP = TP + 1
                 else:
                     FN = FN + 1
             else:
-                if(probas_pred[i] == 1):
+                if(probas_pred[i] >= thr):
                     FP = FP + 1
                 else:
                     TN = TN + 1

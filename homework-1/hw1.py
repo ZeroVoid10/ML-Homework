@@ -37,6 +37,8 @@ class HW1:
                     names=['sepal length', 'sepal width', 'petal length', 'petal width', 'class'])
         self.X = self.data_frame.loc[:, :'petal width']
         self.y = self.data_frame.loc[:, 'class']
+        self.X = self.X.values
+        self.y = self.y.values
         self.cls_cnt = self.data_frame['class'].value_counts()
         if show_class_cnt:
             self.__countplot("class")
