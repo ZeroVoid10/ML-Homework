@@ -10,6 +10,7 @@
 import numpy as np
 import pandas as pd
 from scipy.stats import ttest_rel
+from scipy.stats import t
 import seaborn as sns
 import matplotlib.pyplot as plt
 from kflod_cross_validation import KFlodCrossValidationData
@@ -139,10 +140,26 @@ class HW1:
 
     def paired_ttest(self, clf_1, clf_2):
         if clf_1 in self.est_data and clf_2 in self.est_data:
-            statistic, pvalue = ttest_rel(self.est_data[clf_1].score,
-                                          self.est_data[clf_2].score)
+            score_1 = 1 - np.array(self.est_data[clf_1].score)
+            score_2 = 1 - np.array(self.est_data[clf_2].score)
+            statistic, pvalue = ttest_rel(score_1,score_2)
             print('\n\n=====Paired T-Test=====')
-            print(f'statisitc = {statistic}\npvalue = {pvalue}')
+            # print(f'statisitc = {statistic}\npvalue = {pvalue} (by scipy.state.ttest_rel)')
+            delta = score_1 - score_2
+            sumdelta = sum(delta)
+            mean_delta = sumdelta/self.n_splits
+            fc = 0
+            for d in delta:
+                fc += (d - mean_delta)**2
+            fc /= (self.n_splits - 1)
+            taot = abs(((self.n_splits**0.5)*mean_delta)/(fc**0.5))
+            print(f'taot = {taot}')
+            print(f'比较值 {t.ppf(0.975, self.n_splits - 1)}')
+            print('在95%置信度下:')
+            if taot < t.ppf(0.975, self.n_splits - 1):
+                print(f'{type(clf_1).__name__} 与 {type(clf_2).__name__} 无明显区别')
+            else:
+                print((f'{type(clf_1).__name__}' if np.mean(score_1) <= np.mean(score_2) else f'{type(clf_2).__name__}') + ' 更好')
 
     def train_sk(self, clf, n_splits=10):
         gnb_scores = cross_val_score(clf, self.X, self.y, cv=10, scoring='accuracy')

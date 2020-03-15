@@ -46,18 +46,20 @@ class KFlodCrossValidationData:
     
     def print_mat(self, print_conf=False):
         print(f'\n\n====={self.clf_name}Confusion Matrix & P & R & F1=====')
-        for i,(mat,p,r,f1) in enumerate(zip(self.confusion_mat,
-                                self.P, self.R, self.F1)):
+        for i,(mat,p,r,f1, score) in enumerate(zip(self.confusion_mat,
+                                self.P, self.R, self.F1, self.score)):
             print(f'\n---Flod {i+1}--')
             if print_conf:
                 print(f'Confusion Mat:\n{mat}')
             print(f'P = {p}')
             print(f'R = {r}')
             print(f'F1 = {f1}')
+            print(f'Acc = {score}')
         print('\n---Mean P & R & F1---')
         print(f'Mean P = {np.mean(self.P)}')
         print(f'Mean R = {np.mean(self.R)}')
         print(f'Mean F1 = {np.mean(self.F1)}')
+        print(f'Mean Acc = {np.mean(self.score)}')
         if print_conf:
             print('\n---Sum/Mean Confusion Matrix---')
             print(f'Sum Confusion Matrix = \n{self.sum_conf_mat}')
