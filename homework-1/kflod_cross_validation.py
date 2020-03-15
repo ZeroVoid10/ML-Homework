@@ -227,6 +227,7 @@ class KFlodCrossValidationData:
         last_ind = tps.searchsorted(tps[-1])
         sl = slice(last_ind, None, -1)
         return np.r_[p[sl], 1], np.r_[r[sl], 0], thr[sl]
+        # 效率太低了,电脑卡死
         # for t in threshold_idxs:
         #     tp, tn, fp, fn = self.__get_tp_tn_fp_fn(y_true, probas_pred, t)
         #     p.append(tp/(tp+fp))
