@@ -66,7 +66,7 @@ class HW1:
             X_test = self.X.loc[test_index]
             y_test = self.y.loc[test_index]
             clf.fit(X_train, y_train)
-            flod_data.add_data(clf, X_test, y_test)
+            flod_data.add_data(clf, X_test, y_test, False)
         self.plot_confusion_mat(clf, pre_title=type(clf).__name__ + ' ')
         flod_data.print_mat()
         
@@ -121,8 +121,6 @@ class HW1:
                     flod_data.plot_mean_pr_curve(pr_ax, type(clf).__name__ + ' ')
                     flod_data.plot_mean_roc_curve(roc_ax, type(clf).__name__ + ' ')
         
-
-    
     def plot_confusion_mat(self, clf, fig=None, pre_title=''):
         if clf in self.est_data:
             ax_list = []

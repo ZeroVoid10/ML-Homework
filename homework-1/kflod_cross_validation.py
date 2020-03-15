@@ -28,7 +28,7 @@ class KFlodCrossValidationData:
         self.mean_fpr = np.linspace(0, 1, 100)
         self.mean_auc = None
     
-    def add_data(self, clf, X, y):
+    def add_data(self, clf, X, y, sk=True):
         """ 添加分类方法评估数据
         Args:
             clf: sklearn库中分类器, 需要满足实现predict_proba,predict,score函数
@@ -41,7 +41,7 @@ class KFlodCrossValidationData:
         self.pred.append(clf.predict(X))
         self.score.append(clf.score(X, y))
         self.__cal_matrix(clf, y)
-        self.__pr_roc_curve(y)
+        self.__pr_roc_curve(y, sk=sk)
     
     def print_mat(self, print_conf=False):
         print(f'\n\n====={self.clf_name}Confusion Matrix & P & R & F1=====')
@@ -190,12 +190,12 @@ class KFlodCrossValidationData:
         self.R.append(recall_score(y, self.pred[-1]))
         self.F1.append(f1_score(y, self.pred[-1]))
     
-    def __pr_roc_curve(self, y):
+    def __pr_roc_curve(self, y, sk=True):
         """ 计算PR ROC曲线绘图数据 
             Must call after get new pred and predict_proba data
         """
         # return P R Thr
-        tmp = precision_recall_curve(y, self.predict_proba[-1][:,1])
+        tmp = precision_recall_curve(y, self.predict_proba[-1][:,1]) if sk else self.__precision_recall_curve(y, self.predict_proba[-1][:,1])
         self.pr_thr.append(tmp)
         self.ap.append(auc(tmp[1], tmp[0]))
 
@@ -203,4 +203,42 @@ class KFlodCrossValidationData:
         tmp = roc_curve(y, self.predict_proba[-1][:,1])
         self.fpr_tpr_thr.append(tmp)
         self.auc.append(auc(tmp[0], tmp[1]))
+    
+    def __precision_recall_curve(self, y_true, probas_pred):
+        """ 参考skkearn实现 """
+        p = []
+        r = []
+        thr = []
+        # 获取可作为阈值index
+        desc_score_indices = np.argsort(probas_pred)[::-1]
+        y_true = y_true[desc_score_indices]
+        probas_pred = probas_pred[desc_score_indices]
+        distinct_value_indices = np.where(np.diff(probas_pred))[0]
+        threshold_idxs = np.r_[distinct_value_indices, y_true.size - 1]
+        for t in threshold_idxs:
+            tp, tn, fp, fn = self.__get_tp_tn_fp_fn(y_true, probas_pred, probas_pred[t])
+            p.append(tp/(tp+fp))
+            r.append(tp/(tp+fn))
+            thr.append(probas_pred[t])
+        return [p,r,thr]
+
+    def __get_tp_tn_fp_fn(self, y_true, probas_pred, thr):
+        TP = 0
+        TN = 0
+        FP = 0
+        FN = 0
+
+        for i in range(0, len(y_true)):
+            if(y_true[i] == 1):
+                if(probas_pred[i] >= 1):
+                    TP = TP + 1
+                else:
+                    FN = FN + 1
+            else:
+                if(probas_pred[i] == 1):
+                    FP = FP + 1
+                else:
+                    TN = TN + 1
+        return [TP, TN, FP, FN]
+
     
